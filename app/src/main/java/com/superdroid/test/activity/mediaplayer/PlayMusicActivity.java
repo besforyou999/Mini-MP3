@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.drawable.Drawable;
+import android.media.Image;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
@@ -33,9 +34,9 @@ public class PlayMusicActivity extends AppCompatActivity {
     // Views
     ImageView   img;
     TextView    musicTitle;
-    Button      prevBtn;
-    Button      playBtn;
-    Button      nextBtn;
+    ImageView   prevBtn;
+    ImageView   playBtn;
+    ImageView   nextBtn;
     SeekBar     seekBar;
     TextView    curtime;
     TextView    totalTime;
@@ -48,11 +49,11 @@ public class PlayMusicActivity extends AppCompatActivity {
     String      currentMusicAlbumPath;
 
     Integer     arraySize;
-    String [] musicArr;
-    String [] musicPathArr;
-    int [] albumIdArr;
-    String [] albumPathArr;
-    int mIdx = 0;
+    String []   musicArr;
+    String []   musicPathArr;
+    int []      albumIdArr;
+    String []   albumPathArr;
+    int         mIdx = 0;
 
     MediaPlayer mPlayer;
 
@@ -67,9 +68,9 @@ public class PlayMusicActivity extends AppCompatActivity {
         // View 등록
         img = (ImageView) findViewById(R.id.center_album);
         musicTitle = (TextView) findViewById(R.id.music_title_text);
-        prevBtn = (Button) findViewById(R.id.previous_button);
-        playBtn = (Button) findViewById(R.id.play_button);
-        nextBtn = (Button) findViewById(R.id.next_button);
+        prevBtn = (ImageView) findViewById(R.id.previous_button);
+        playBtn = (ImageView) findViewById(R.id.play_button);
+        nextBtn = (ImageView) findViewById(R.id.next_button);
         seekBar = (SeekBar) findViewById(R.id.seekBar);
         curtime = (TextView) findViewById(R.id.curtime_textview);
         totalTime = (TextView) findViewById(R.id.totalTime_textView);
@@ -80,6 +81,13 @@ public class PlayMusicActivity extends AppCompatActivity {
 
         seekBar.setOnSeekBarChangeListener(mOnSeek);
         mProgressHandler.sendEmptyMessageDelayed(0, 200);
+
+        // 이전 버튼, 다음 버튼 크기 조절
+        prevBtn.getLayoutParams().height = 200;
+        prevBtn.getLayoutParams().width = 200;
+
+        nextBtn.getLayoutParams().height = 200;
+        nextBtn.getLayoutParams().width = 200;
 
         // 전달된 데이터 받기
         Intent intent = getIntent();
@@ -212,11 +220,17 @@ public class PlayMusicActivity extends AppCompatActivity {
             case R.id.play_button:
                 if (mPlayer.isPlaying() == false) {
                     mPlayer.start();
-                    playBtn.setText("Pause");
+                    //playBtn.setText("Pause");
+                    playBtn.setImageResource(R.drawable.pause);
+                    playBtn.getLayoutParams().height = 250;
+                    playBtn.getLayoutParams().width = 250;
                     play = true;
                 } else {
                     mPlayer.pause();
-                    playBtn.setText("Play");
+                    //playBtn.setText("Play");
+                    playBtn.setImageResource(R.drawable.play);
+                    playBtn.getLayoutParams().height = 250;
+                    playBtn.getLayoutParams().width = 250;
                     play = false;
                 }
                 break;
@@ -233,7 +247,7 @@ public class PlayMusicActivity extends AppCompatActivity {
 
                 if (wasPlaying) {
                     mPlayer.start();
-                    playBtn.setText("Pause");
+                    //playBtn.setText("Pause");
                     play = true;
                 }
                 break;
