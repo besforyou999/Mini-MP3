@@ -16,7 +16,7 @@
         android:theme="@style/Theme.MediaPlayer">
 
         <service
-            android:name=".testService"
+            android:name=".ForegroundService"
             android:enabled="true"
             android:exported="true"></service>
 

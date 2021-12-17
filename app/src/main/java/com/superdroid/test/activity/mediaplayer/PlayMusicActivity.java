@@ -2,11 +2,17 @@ package com.superdroid.test.activity.mediaplayer;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
 import android.media.Image;
 import android.media.MediaPlayer;
@@ -55,7 +61,16 @@ public class PlayMusicActivity extends AppCompatActivity {
     String []   albumPathArr;
     int         mIdx = 0;
 
+
     MediaPlayer mPlayer;
+
+    // controls
+    public static String MAIN_ACTION = "com.superdroid.test.activity.mediaplayer.MainActivity";
+    public static String PLAY_ACTION = "com.superdroid.test.activity.mediaplayer.Play";
+    public static String NEXT_PLAY_ACTION = "com.superdroid.test.activity.mediaplayer.nextplay";
+    public static String START_FOREGROUND_ACTION = "com.superdroid.test.activity.mediaplayer.startforeground";
+    public static String STOP_FOREGROUND_ACTION = "com.superdroid.test.activity.mediaplayer.stopforeground";
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,14 +81,14 @@ public class PlayMusicActivity extends AppCompatActivity {
         mPlayer = new MediaPlayer();
 
         // View 등록
-        img = (ImageView) findViewById(R.id.center_album);
-        musicTitle = (TextView) findViewById(R.id.music_title_text);
-        prevBtn = (ImageView) findViewById(R.id.previous_button);
-        playBtn = (ImageView) findViewById(R.id.play_button);
-        nextBtn = (ImageView) findViewById(R.id.next_button);
-        seekBar = (SeekBar) findViewById(R.id.seekBar);
-        curtime = (TextView) findViewById(R.id.curtime_textview);
-        totalTime = (TextView) findViewById(R.id.totalTime_textView);
+        img         = (ImageView) findViewById(R.id.center_album);
+        musicTitle  = (TextView) findViewById(R.id.music_title_text);
+        prevBtn     = (ImageView) findViewById(R.id.previous_button);
+        playBtn     = (ImageView) findViewById(R.id.play_button);
+        nextBtn     = (ImageView) findViewById(R.id.next_button);
+        seekBar     = (SeekBar) findViewById(R.id.seekBar);
+        curtime     = (TextView) findViewById(R.id.curtime_textview);
+        totalTime   = (TextView) findViewById(R.id.totalTime_textView);
 
         mPlayer.setOnCompletionListener(mOnComplete);
         mPlayer.setOnErrorListener(mOnError);
@@ -92,28 +107,29 @@ public class PlayMusicActivity extends AppCompatActivity {
         // 전달된 데이터 받기
         Intent intent = getIntent();
 
-        arraySize = intent.getIntExtra("arraySize", 20);
-        currentMusicTitle = intent.getStringExtra("title");
-        currentMusicAlbumId = intent.getIntExtra("album_id",0);
+        arraySize             = intent.getIntExtra("arraySize", 20);
+        currentMusicTitle     = intent.getStringExtra("title");
+        currentMusicAlbumId   = intent.getIntExtra("album_id",0);
         currentMusicAlbumPath = intent.getStringExtra("music_album_path");
 
-        musicArr = new String[arraySize];
-        albumIdArr = new int[arraySize];
-        albumPathArr = new String[arraySize];
-        musicPathArr = new String[arraySize];
+        musicArr        = new String[arraySize];
+        albumIdArr      = new int[arraySize];
+        albumPathArr    = new String[arraySize];
+        musicPathArr    = new String[arraySize];
 
-        musicArr = intent.getStringArrayExtra("musicArr");
-        albumIdArr = intent.getIntArrayExtra("albumIdArr");
-        albumPathArr = intent.getStringArrayExtra("albumPathArr");
+        musicArr        = intent.getStringArrayExtra("musicArr");
+        albumIdArr      = intent.getIntArrayExtra("albumIdArr");
+        albumPathArr    = intent.getStringArrayExtra("albumPathArr");
 
         // 전달 받은 데이터로 초기화면 설정
         musicTitle.setText(currentMusicTitle + ".mp3");
 
         Drawable d = ContextCompat.getDrawable(this, R.drawable.ic_launcher_foreground);
-        if (currentMusicAlbumPath != null)
-            d = Drawable.createFromPath(currentMusicAlbumPath);
+
+        if (currentMusicAlbumPath != null) d = Drawable.createFromPath(currentMusicAlbumPath);
 
         img.setImageDrawable(d);
+
 
         // 음악들의 경로 저장 + idx 인덱스 설정
         File file = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -128,7 +144,30 @@ public class PlayMusicActivity extends AppCompatActivity {
             finish();
         }
 
+        String CHANNEL_ID = "Channel One";
+        String name = "Title";
+        final int NOTIFICATION_ID = 1;
 
+        NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_LOW);
+        NotificationCompat.Builder notiBuilder = new NotificationCompat.Builder(this, CHANNEL_ID);
+        Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.play);
+        notiBuilder.setLargeIcon(icon);
+        notiBuilder.setContentTitle("[Notice] MobileProgramming");
+        notiBuilder.setContentText("November 9 rest");
+        notiBuilder.setSubText("will do more");
+
+        Intent playIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, playIntent,0);
+
+        notiBuilder.setContentIntent(pendingIntent);
+
+        NotificationManager mNotiManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+        mNotiManager.createNotificationChannel(channel);
+
+        mNotiManager.notify(NOTIFICATION_ID, notiBuilder.build());
+
+        return;
     }
 
     // 액티비티 종료 시 mPlayer 강제 종료
@@ -138,6 +177,7 @@ public class PlayMusicActivity extends AppCompatActivity {
             mPlayer.release();
             mPlayer = null;
         }
+
     }
 
     boolean LoadMedia(int idx) {
@@ -164,20 +204,21 @@ public class PlayMusicActivity extends AppCompatActivity {
     }
 
     public void setTotalTime() {
-        int dur = mPlayer.getDuration();
-        dur = dur / 1000;   // msec -> sec
+        int dur     = mPlayer.getDuration();
+        dur         = dur / 1000;   // msec -> sec
         Integer min = dur / 60;
         Integer sec = dur % 60;
         String minutes = new String();
         String seconds = new String();
         String t = new String();
-        if (min < 10)
-            minutes = "0";
+
+        if (min < 10) minutes = "0";
+
         minutes += min.toString();
         t = minutes + ":";
 
-        if (sec < 10)
-            seconds = "0";
+        if (sec < 10) seconds = "0";
+
         seconds += sec.toString();
         t += seconds;
 
@@ -185,22 +226,24 @@ public class PlayMusicActivity extends AppCompatActivity {
     }
 
     public void setCurtime() {
-        int dur = mPlayer.getCurrentPosition();
-        dur = dur / 1000;   // msec -> sec
+        int dur     = mPlayer.getCurrentPosition();
+        dur         = dur / 1000;   // msec -> sec
         Integer min = dur / 60;
         Integer sec = dur % 60;
         String minutes = new String();
         String seconds = new String();
         String t = new String();
-        if (min < 10)
-            minutes = "0";
+
+        if (min < 10) minutes = "0";
+
         minutes += min.toString();
         t = minutes + ":";
 
-        if (sec < 10)
-            seconds = "0";
+        if (sec < 10) seconds = "0";
+
         seconds += sec.toString();
         t += seconds;
+
         curtime.setText(t);
     }
 
@@ -225,6 +268,13 @@ public class PlayMusicActivity extends AppCompatActivity {
                     playBtn.getLayoutParams().height = 250;
                     playBtn.getLayoutParams().width = 250;
                     play = true;
+
+                    // create notification service
+                     //Intent startIntent = new Intent(PlayMusicActivity.this, ForegroundService.class);
+                    // startIntent.setAction(START_FOREGROUND_ACTION);
+                     //startService(startIntent);
+                    break;
+
                 } else {
                     mPlayer.pause();
                     //playBtn.setText("Play");
@@ -232,6 +282,11 @@ public class PlayMusicActivity extends AppCompatActivity {
                     playBtn.getLayoutParams().height = 250;
                     playBtn.getLayoutParams().width = 250;
                     play = false;
+
+                    // create notification service
+                    // Intent stopIntent = new Intent(PlayMusicActivity.this, ForegroundService.class);
+                    // stopIntent.setAction(STOP_FOREGROUND_ACTION);
+                    // startService(stopIntent);
                 }
                 break;
             case R.id.previous_button:
