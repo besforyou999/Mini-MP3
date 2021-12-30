@@ -1,7 +1,7 @@
 # MyMP3
 #### Simple MP3 player ( 미완성 상태 )
 #### 
-## Features
+## Features ( 기능 )
 ### 1. 기기에 저장된 mp3 파일을 읽고 리스트에 올립니다.
 #### 
 #### 
