@@ -7,17 +7,22 @@
 #### 
 <img src="https://user-images.githubusercontent.com/74638588/147723587-fbf8c8a2-307c-4bde-a2c8-338493a5fa75.png" width="260" height="500">
 
-### 2. 듣고 싶은 음악을 터치하면 재생 화면이 시작됩니다.
+### 2. Play 버튼을 눌러 음악을 재생시키고 Pause 버튼을 눌러 재생을 일시정지 시킵니다.
+#### 
+#### 
+<img src="https://user-images.githubusercontent.com/74638588/147730019-d0469be1-49fa-4caf-8940-82656b498074.png" width="260" height="500">
+
+### 3. 듣고 싶은 음악을 터치하면 재생 화면이 시작됩니다.
 #### 
 #### 
 <img src="https://user-images.githubusercontent.com/74638588/147724206-26a2f4fa-06ba-4cac-972a-2376fa162fed.png" width="260" height="500">
 
-### 3. 다른 작업을 하는 도중 알림창으로도 재생/일시정지가 가능합니다.
+### 4. 다른 작업을 하는 도중 알림창으로도 재생/일시정지가 가능합니다.
 #### 
 #### 
 <img src="https://user-images.githubusercontent.com/74638588/147724955-2a752e83-4045-492b-886f-8b08a92927bf.png" width="260" height="500">
 
-### 4. 음악 재생/일시정지시 알림창 아이콘도 바뀝니다.
+### 5. 음악 재생/일시정지시 알림창 아이콘도 바뀝니다.
 #### 
 #### 
 #### 재생
