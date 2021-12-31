@@ -1,4 +1,4 @@
-# MyMP3
+# Mini-MP3
 #### Simple MP3 player ( 미완성 상태 )
 #### 
 ## Features ( 기능 )
