@@ -9,17 +9,13 @@ import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import org.w3c.dom.Text;
-
 import java.util.ArrayList;
 
 public class ListViewAdapter extends BaseAdapter {
     private ArrayList<ListViewItem> listViewItemList = new ArrayList<ListViewItem>();
 
     // ListViewAdapter의 생성자
-    public ListViewAdapter() {
-
-    }
+    public ListViewAdapter() { }
 
     // Adapter에 사용되는 데이터의 개수 리턴. 필수 구현
     @Override

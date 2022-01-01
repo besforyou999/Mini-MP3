@@ -3,16 +3,16 @@ package com.superdroid.test.activity.mediaplayer;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.Manifest;
 import android.content.ContentResolver;
-import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaScannerConnection;
@@ -20,30 +20,26 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.ParcelFileDescriptor;
+import android.provider.BaseColumns;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ImageView;
 import android.widget.ListView;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FilenameFilter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Serializable;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
+    public static String STOP_FOREGROUND_ACTION  = "com.superdroid.test.activity.mainactivity.stopforeground";
+
     private ArrayList<musicData> musicList;
-    private HashMap<Integer, String> map;
+
+    // 앨범 생성용
+    Bitmap                  androidIcon;
+    MediaMetadataRetriever  mmr;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,8 +47,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         // 음악 제목, 음악 앨범 저장할 배열
-        musicList = new ArrayList<>();
-        map = new HashMap<>();
+        musicList   = new ArrayList<>();
+
+        // 음악 앨범 생성용
+        mmr         = new MediaMetadataRetriever();
+        androidIcon = BitmapFactory.decodeResource(getResources(), android.R.drawable.ic_media_play);
 
         // 리스트 뷰, 리스트 뷰 어댑터 객체 생성
         ListView listView;
@@ -66,8 +65,9 @@ public class MainActivity extends AppCompatActivity {
         // 앱 처음 실행 시에는 MediaStore 접근 불가. 권한을 허락하고 앱을 재실행 해주세요
         checkPermission();
 
-        // Music 디렉토리 속 mp3 파일들 읽기
+        // mp3 파일들 읽기
         File file = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+
         FilenameFilter filter = new FilenameFilter() {
             @Override
             public boolean accept(File file, String s) {
@@ -78,7 +78,10 @@ public class MainActivity extends AppCompatActivity {
         File [] files = file.listFiles(filter);
         String [] filePaths = new String[files.length];
 
-        for (int i = 0 ; i < files.length ; i++) filePaths[i] = files[i].getAbsolutePath();
+        for (int i = 0 ; i < files.length ; i++) {
+            filePaths[i] = files[i].getAbsolutePath();
+            Log.d("filePaths", filePaths[i]);
+        }
 
         // Downloads 디렉토리의 음악 파일들 MediaScanner로 scan
         MediaScannerConnection.scanFile(this, filePaths, null, new MediaScannerConnection.OnScanCompletedListener() {
@@ -89,33 +92,12 @@ public class MainActivity extends AppCompatActivity {
         });
 
         // MediaStore로 음악 파일 읽기
-        readMusicAlbums();
-        readAudioFiles();
-
-        // 다음 액티비티에 전달한 배열 생성
-        String [] musicArr = new String[musicList.size()];
-        Integer [] albumIdArr = new Integer[musicList.size()];
-        String [] albumPathArr = new String [musicList.size()];
-
+        buildSongList();
 
         // 리스트뷰 어댑터에 목록 아이템 추가
         for (int i = 0 ; i < musicList.size() ; i++) {
-            String title = musicList.get(i).getTitle();
-            Integer id = musicList.get(i).getAlbum_id();
-            String albumPath = map.get(id);
-
-            musicArr[i] = title;
-            albumIdArr[i] = id;
-            albumPathArr[i] = albumPath;
-
-            Drawable img = ContextCompat.getDrawable(this, R.drawable.ic_launcher_foreground);
-            musicList.get(i).setMusic_album_path(albumPath);
-
-            if (albumPath != null) {
-                img = Drawable.createFromPath(albumPath);
-            }
-            // 앨범이 없으면 그냥 안드로이드 아이콘 추가
-            adapter.addItem(img,title);
+            musicData md = musicList.get(i);
+            adapter.addItem(md.getDrawable(),md.getTitle());
         }
 
         // 리스트뷰 아이템 클릭 핸들러 추가
@@ -128,13 +110,9 @@ public class MainActivity extends AppCompatActivity {
                    musicData md = musicList.get(i);
                    if (md.getTitle().equals(title)) {
                        Intent intent = new Intent();
-                       intent.putExtra("title", title);
-                       intent.putExtra("album_id", md.getAlbum_id());
-                       intent.putExtra("music_album_path", md.getMusic_album_path());
-                       intent.putExtra("arraySize", musicList.size());
-                       intent.putExtra("musicArr", musicArr);
-                       intent.putExtra("albumIdArr", albumIdArr);
-                       intent.putExtra("albumPathArr", albumPathArr);
+                       intent.putExtra("music_title", title);
+                       intent.putExtra("music_path", md.getPathId());
+                       intent.putExtra("music_duration", md.getDuration());
                        intent.setClass(getApplicationContext(), PlayMusicActivity.class);
                        startActivity(intent);
                    }
@@ -143,65 +121,50 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void readAudioFiles() {
-        Uri externalUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
-        String[] projection = new String[]{
-                MediaStore.Audio.Media.TITLE,
-                MediaStore.Audio.Media.ALBUM_ID,
-        };
+    public void buildSongList() {
 
-        Cursor cursor = getContentResolver().query(externalUri, projection, null, null, null);
+        ContentResolver mResolver = getContentResolver();
+        Uri musicUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+        Cursor cursor = mResolver.query(musicUri, null, null, null, null);
 
-        if (cursor == null || !cursor.moveToFirst()) {
-            Log.e("cursor", "cursor null or cursor is empty");
+        if (cursor == null) { Log.e("cursor", "album cursor null");
             return;
         }
 
-        do {
-            int columnCount = cursor.getColumnCount();
-            for (int i = 0 ; i < columnCount ; i++) {
-                Log.d("cursor",cursor.getColumnName(i) + " : " + cursor.getString(i));
-            }
-
-            musicList.add(new musicData(cursor.getString(0) , Integer.parseInt(cursor.getString(1))));
-
-        } while (cursor.moveToNext());
-
-        cursor.close();
-    }
-
-    public void readMusicAlbums() {
-
-        Uri albumsUri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI;
-
-        String [] albumProjection = new String [] {
-                MediaStore.Audio.Albums.ALBUM_ART,
-                MediaStore.Audio.Albums.ALBUM_ID
-        };
-
-        Cursor cursor = getContentResolver().query(albumsUri,albumProjection, null, null, null);
-
-        if (cursor == null || !cursor.moveToFirst()) {
-            Log.e("cursor", "album cursor null or album cursor is empty");
+        if (!cursor.moveToFirst()) { Log.e("cursor", "cursor moveToFirst error");
             return;
         }
 
-        int albumArt = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ART);
-        int albumId = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ID);
+        int musicTitle   = cursor.getColumnIndex(MediaStore.MediaColumns.TITLE);
+        int id           = cursor.getColumnIndex(BaseColumns._ID);
+        int artist       = cursor.getColumnIndex(MediaStore.Audio.AudioColumns.ARTIST);
+        int column_index = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA);
+        int duration     = cursor.getColumnIndex(MediaStore.Audio.Media.DURATION);
 
         do {
-            int columnCount = cursor.getColumnCount();
-            for (int i = 0 ; i < columnCount ; i++) {
-                Log.d("cursor",cursor.getColumnName(i) + " : " + cursor.getString(i));
+
+            String  MusicTitle  = cursor.getString(musicTitle);
+            Long    ID          = cursor.getLong(id);
+            String  Artist      = cursor.getString(artist);
+            String  pathId      = cursor.getString(column_index);
+            Integer Duration    = cursor.getInt(duration);
+
+            byte [] byteArr;
+            mmr.setDataSource(pathId);
+            Drawable albumArt = new BitmapDrawable(getResources(), androidIcon);
+            byteArr = mmr.getEmbeddedPicture();
+
+            if (byteArr != null) {
+                Bitmap bm = BitmapFactory.decodeByteArray(byteArr, 0, byteArr.length);
+                albumArt  = new BitmapDrawable(getResources(), bm);
             }
 
-            map.put(Integer.parseInt(cursor.getString(albumId)), cursor.getString(albumArt));
+            musicList.add(new musicData(MusicTitle, Artist, ID, pathId, Duration, albumArt ));
 
         } while (cursor.moveToNext());
 
-        cursor.close();
+        return;
     }
-
 
     public void checkPermission() {
         if (Build.VERSION.SDK_INT >= 23) {
@@ -211,7 +174,8 @@ public class MainActivity extends AppCompatActivity {
             }
             else {
                 ActivityCompat.requestPermissions(this,
-                        new String[]{ Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE , Manifest.permission.FOREGROUND_SERVICE },
+                        new String[]{ Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE ,
+                                Manifest.permission.FOREGROUND_SERVICE },
                         1);
             }
         }
@@ -228,4 +192,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d("flowDebug", "onDestroy called in MainActivity");
+
+        Intent  destroyService = new Intent();
+        destroyService.setAction(STOP_FOREGROUND_ACTION);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(destroyService);
+
+    }
 }

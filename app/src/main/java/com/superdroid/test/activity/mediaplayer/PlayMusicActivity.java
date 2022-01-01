@@ -1,44 +1,31 @@
 package com.superdroid.test.activity.mediaplayer;
 
-import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.NotificationCompat;
-import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
+import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Point;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.media.Image;
-import android.media.MediaPlayer;
-import android.net.Uri;
+import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.Message;
-import android.provider.MediaStore;
 import android.util.Log;
+import android.view.Display;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
-
-import java.io.File;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.util.ArrayList;
 
 public class PlayMusicActivity extends AppCompatActivity {
 
     // Views
-    ImageView   img;
+    ImageView   albumView;
     TextView    musicTitle;
     ImageView   prevBtn;
     ImageView   playBtn;
@@ -48,40 +35,38 @@ public class PlayMusicActivity extends AppCompatActivity {
     TextView    totalTime;
 
     // Activity
-    Boolean     play = true;
-    Integer     currentMusicAlbumId;
+    Boolean     play = false;
+    Boolean     isPaused;
     String      currentMusicTitle;
     String      currentMusicFilePath;
-    String      currentMusicAlbumPath;
 
-    Integer     arraySize;
-    String []   musicArr;
-    String []   musicPathArr;
-    int []      albumIdArr;
-    String []   albumPathArr;
-    int         mIdx = 0;
+    // Icons
+    Bitmap      playIcon;
+    Bitmap      prevIcon;
+    Bitmap      nextIcon;
+    Bitmap      pauseIcon;
 
+    // Broadcast Receiver
+    BroadcastReceiver mBroadcastReceiver;
 
-    MediaPlayer mPlayer;
+    // Seekbar data
+    Integer     seekbarDuration;
+    Integer     seekbarCurrentPos;
 
-    // controls
-    public static String MAIN_ACTION = "com.superdroid.test.activity.mediaplayer.MainActivity";
-    public static String PLAY_ACTION = "com.superdroid.test.activity.mediaplayer.Play";
-    public static String NEXT_PLAY_ACTION = "com.superdroid.test.activity.mediaplayer.nextplay";
-    public static String START_FOREGROUND_ACTION = "com.superdroid.test.activity.mediaplayer.startforeground";
-    public static String STOP_FOREGROUND_ACTION = "com.superdroid.test.activity.mediaplayer.stopforeground";
-
+    public static String PLAY_ACTION             = "com.superdroid.test.activity.mainactivity.play";
+    public static String PAUSE_ACTION            = "com.superdroid.test.activity.mainactivity.pause";
+    public static String START_FOREGROUND_ACTION = "com.superdroid.test.activity.mainactivity.startforeground";
+    public static String SEEKBAR_CURRENT_POS     = "com.superdroid.test.activity.mainactivity.seekbarCurrentPos";
+    public static String MUSIC_FINISHED          = "com.superdroid.test.activity.mainactivity.musicFinished";
+    public static String NOTI_PLAY_BTN_CHANGE    = "com.superdroid.test.activity.mainactivity.notiPlayBtnClick";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_play_music);
 
-        // MediaPlayer 생성
-        mPlayer = new MediaPlayer();
-
         // View 등록
-        img         = (ImageView) findViewById(R.id.center_album);
+        albumView   = (ImageView) findViewById(R.id.center_album);
         musicTitle  = (TextView) findViewById(R.id.music_title_text);
         prevBtn     = (ImageView) findViewById(R.id.previous_button);
         playBtn     = (ImageView) findViewById(R.id.play_button);
@@ -90,280 +75,198 @@ public class PlayMusicActivity extends AppCompatActivity {
         curtime     = (TextView) findViewById(R.id.curtime_textview);
         totalTime   = (TextView) findViewById(R.id.totalTime_textView);
 
-        mPlayer.setOnCompletionListener(mOnComplete);
-        mPlayer.setOnErrorListener(mOnError);
-        mPlayer.setOnSeekCompleteListener(mOnSeekComplete);
+        // Create Icon
+        playIcon  = BitmapFactory.decodeResource(getResources(), android.R.drawable.ic_media_play);
+        prevIcon  = BitmapFactory.decodeResource(getResources(), android.R.drawable.ic_media_previous);
+        nextIcon  = BitmapFactory.decodeResource(getResources(), android.R.drawable.ic_media_next);
+        pauseIcon = BitmapFactory.decodeResource(getResources(), android.R.drawable.ic_media_pause);
 
-        seekBar.setOnSeekBarChangeListener(mOnSeek);
-        mProgressHandler.sendEmptyMessageDelayed(0, 200);
+        float bmpWidth  = playIcon.getWidth() * 1.5f;
+        float bmpHeight = playIcon.getHeight() * 1.5f;
 
-        // 이전 버튼, 다음 버튼 크기 조절
-        prevBtn.getLayoutParams().height = 200;
-        prevBtn.getLayoutParams().width = 200;
+        playIcon  = Bitmap.createScaledBitmap(playIcon, (int)bmpWidth, (int)bmpHeight, true);
+        prevIcon  = Bitmap.createScaledBitmap(prevIcon, (int)bmpWidth, (int)bmpHeight, true);
+        nextIcon  = Bitmap.createScaledBitmap(nextIcon, (int)bmpWidth, (int)bmpHeight, true);
+        pauseIcon = Bitmap.createScaledBitmap(pauseIcon, (int)bmpWidth, (int)bmpHeight, true);
 
-        nextBtn.getLayoutParams().height = 200;
-        nextBtn.getLayoutParams().width = 200;
+        prevBtn.setImageBitmap(prevIcon);
+        playBtn.setImageBitmap(playIcon);
+        nextBtn.setImageBitmap(nextIcon);
 
         // 전달된 데이터 받기
         Intent intent = getIntent();
 
-        arraySize             = intent.getIntExtra("arraySize", 20);
-        currentMusicTitle     = intent.getStringExtra("title");
-        currentMusicAlbumId   = intent.getIntExtra("album_id",0);
-        currentMusicAlbumPath = intent.getStringExtra("music_album_path");
+        currentMusicTitle       = intent.getStringExtra("music_title");
+        currentMusicFilePath    = intent.getStringExtra("music_path");
+        seekbarDuration         = intent.getIntExtra("music_duration", 0);
+        isPaused                = intent.getBooleanExtra("isPaused", true);
+        seekbarCurrentPos       = intent.getIntExtra("currentPos", 0);
 
-        musicArr        = new String[arraySize];
-        albumIdArr      = new int[arraySize];
-        albumPathArr    = new String[arraySize];
-        musicPathArr    = new String[arraySize];
-
-        musicArr        = intent.getStringArrayExtra("musicArr");
-        albumIdArr      = intent.getIntArrayExtra("albumIdArr");
-        albumPathArr    = intent.getStringArrayExtra("albumPathArr");
-
-        // 전달 받은 데이터로 초기화면 설정
+        // 음악 제목 설정
         musicTitle.setText(currentMusicTitle + ".mp3");
 
-        Drawable d = ContextCompat.getDrawable(this, R.drawable.ic_launcher_foreground);
+        // 앨범 설정
+        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+        mmr.setDataSource(currentMusicFilePath);
+        byte [] data = mmr.getEmbeddedPicture();
 
-        if (currentMusicAlbumPath != null) d = Drawable.createFromPath(currentMusicAlbumPath);
+        Drawable img = new BitmapDrawable(getResources(), playIcon);
 
-        img.setImageDrawable(d);
-
-
-        // 음악들의 경로 저장 + idx 인덱스 설정
-        File file = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        for (int i = 0 ; i < arraySize ; i++) {
-            musicPathArr[i] = file.getAbsolutePath() + "/" + musicArr[i] + ".mp3";
-            if ( currentMusicTitle.equals(musicArr[i])) mIdx = i;
+        if (data != null) {
+            Bitmap bm = BitmapFactory.decodeByteArray(data, 0, data.length);
+            img = new BitmapDrawable(getResources(), bm);
         }
 
-        // 선택한 음악을 Media에 load
-        if (LoadMedia(mIdx) == false) {
-            Toast.makeText(this, "Cannot read file", Toast.LENGTH_SHORT).show();
-            finish();
+        albumView.setImageDrawable(img);
+
+        Point screenSize = getScreenSize(this);
+
+        albumView.getLayoutParams().width  = screenSize.x;
+        albumView.getLayoutParams().height = screenSize.x;
+
+        // notification 눌러서 다시 불러진 액티비티인 경우
+        // 음악이 재생중이였다 -> play button = pause icon
+        // 음악이 일시정지중이였다 - > play button = play icon
+        if (isPaused == false) {
+            playBtn.setImageBitmap(pauseIcon);
+            play = true;
+        } else if ( isPaused == true) {
+            playBtn.setImageBitmap(playIcon);
+            play = false;
         }
 
-        String CHANNEL_ID = "Channel One";
-        String name = "Title";
-        final int NOTIFICATION_ID = 1;
+        // seekbar duration, seekbar current pos 설정
+        setTotalTime(seekbarDuration);
+        setCurtime(seekbarCurrentPos);
 
-        NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_LOW);
-        NotificationCompat.Builder notiBuilder = new NotificationCompat.Builder(this, CHANNEL_ID);
-        Bitmap icon = BitmapFactory.decodeResource(getResources(), R.drawable.play);
-        notiBuilder.setLargeIcon(icon);
-        notiBuilder.setContentTitle("[Notice] MobileProgramming");
-        notiBuilder.setContentText("November 9 rest");
-        notiBuilder.setSubText("will do more");
+        // register receiver 생성
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(SEEKBAR_CURRENT_POS);
+        intentFilter.addAction(MUSIC_FINISHED);
 
-        Intent playIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, playIntent,0);
+        mBroadcastReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String flag = intent.getAction();
+                if (flag.equals(MUSIC_FINISHED) || flag.equals(SEEKBAR_CURRENT_POS)) {
+                    seekbarCurrentPos = intent.getIntExtra("seekbarCurrentPos", 0);
+                    setCurtime(seekbarCurrentPos);
+                    seekBar.setProgress(seekbarCurrentPos);
+                    if (intent.getAction().equals(MUSIC_FINISHED)) {
+                        play = false;
+                        playBtn.setImageBitmap(playIcon);
+                    }
+                } else if (flag.equals(NOTI_PLAY_BTN_CHANGE)) {
+                    if (intent.getBooleanExtra("change_to_play",true)) {
+                        playBtn.setImageBitmap(playIcon);
+                    } else
+                        playBtn.setImageBitmap(pauseIcon);
+                }
+            }
+        };
+        // register receiver 등록
+        LocalBroadcastManager.getInstance(this).registerReceiver(mBroadcastReceiver, intentFilter);
 
-        notiBuilder.setContentIntent(pendingIntent);
+        // register seekbar listener
+        seekBar.setOnSeekBarChangeListener(mOnSeek);
 
-        NotificationManager mNotiManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        Intent playIntent = new Intent(PlayMusicActivity.this, ForegroundService.class);
+        playIntent.setAction(START_FOREGROUND_ACTION);
+        playIntent.putExtra("music_title", currentMusicTitle);
+        playIntent.putExtra("music_path", currentMusicFilePath);
+        playIntent.putExtra("music_duration", seekbarDuration);
+        startService(playIntent);
 
-        mNotiManager.createNotificationChannel(channel);
-
-        mNotiManager.notify(NOTIFICATION_ID, notiBuilder.build());
-
-        return;
     }
 
-    // 액티비티 종료 시 mPlayer 강제 종료
-    public void onDestory() {
+    public void mOnClick(View v) {
+        switch (v.getId()) {
+            case R.id.play_button:
+                if (play == false) {
+                    // 서비스에 시작 버튼 눌렀다는 인텐트 발송
+                    Intent playIntent = new Intent();
+                    playIntent.setAction(PLAY_ACTION);
+                    LocalBroadcastManager.getInstance(this).sendBroadcast(playIntent);
+                    playBtn.setImageBitmap(pauseIcon);
+                    play = true;
+                } else {
+                    // 서비스에 pause 버튼 눌렀다는 인텐트 발송
+                    Intent pauseIntent = new Intent();
+                    pauseIntent.setAction(PAUSE_ACTION);
+                    LocalBroadcastManager.getInstance(this).sendBroadcast(pauseIntent);
+                    playBtn.setImageBitmap(playIcon);
+                    play = false;
+                }
+                break;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
         super.onDestroy();
-        if (mPlayer != null) {
-            mPlayer.release();
-            mPlayer = null;
-        }
-
+        Log.d("flowDebug", "onDestroy called in PlayMusicActivity");
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mBroadcastReceiver);
     }
 
-    boolean LoadMedia(int idx) {
-        try {
-            mPlayer.setDataSource(musicPathArr[idx]);
-        } catch (IllegalArgumentException e) {
-            return false;
-        } catch (IllegalStateException e) {
-            return false;
-        } catch (IOException e) {
-            return false;
-        }
-
-        if (Prepare() == false) {
-            return false;
-        }
-
-        int dur = mPlayer.getDuration();
-        musicTitle.setText(musicArr[idx]);
-        seekBar.setMax(dur);
-        setTotalTime();
-
-        return true;
-    }
-
-    public void setTotalTime() {
-        int dur     = mPlayer.getDuration();
-        dur         = dur / 1000;   // msec -> sec
+    public void setTotalTime(int dur) {
+        dur = dur / 1000;   // msec -> sec
         Integer min = dur / 60;
         Integer sec = dur % 60;
         String minutes = new String();
         String seconds = new String();
         String t = new String();
-
-        if (min < 10) minutes = "0";
-
+        if (min < 10)
+            minutes = "0";
         minutes += min.toString();
         t = minutes + ":";
 
-        if (sec < 10) seconds = "0";
-
+        if (sec < 10)
+            seconds = "0";
         seconds += sec.toString();
         t += seconds;
 
         totalTime.setText("/ " + t);
+        seekBar.setMax(seekbarDuration);
     }
 
-    public void setCurtime() {
-        int dur     = mPlayer.getCurrentPosition();
-        dur         = dur / 1000;   // msec -> sec
+    public void setCurtime(int dur) {
+        dur = dur / 1000;   // msec -> sec
         Integer min = dur / 60;
         Integer sec = dur % 60;
         String minutes = new String();
         String seconds = new String();
         String t = new String();
-
-        if (min < 10) minutes = "0";
-
+        if (min < 10)
+            minutes = "0";
         minutes += min.toString();
         t = minutes + ":";
 
-        if (sec < 10) seconds = "0";
-
+        if (sec < 10)
+            seconds = "0";
         seconds += sec.toString();
         t += seconds;
-
         curtime.setText(t);
+        seekBar.setProgress(dur);
     }
-
-    boolean Prepare() {
-        try {
-            mPlayer.prepare();
-        } catch (IllegalStateException e) {
-            return false;
-        } catch (IOException e) {
-            return false;
-        }
-        return true;
-    }
-
-    public void mOnClick(View v) {
-        switch(v.getId()) {
-            case R.id.play_button:
-                if (mPlayer.isPlaying() == false) {
-                    mPlayer.start();
-                    //playBtn.setText("Pause");
-                    playBtn.setImageResource(R.drawable.pause);
-                    playBtn.getLayoutParams().height = 250;
-                    playBtn.getLayoutParams().width = 250;
-                    play = true;
-
-                    // create notification service
-                     //Intent startIntent = new Intent(PlayMusicActivity.this, ForegroundService.class);
-                    // startIntent.setAction(START_FOREGROUND_ACTION);
-                     //startService(startIntent);
-                    break;
-
-                } else {
-                    mPlayer.pause();
-                    //playBtn.setText("Play");
-                    playBtn.setImageResource(R.drawable.play);
-                    playBtn.getLayoutParams().height = 250;
-                    playBtn.getLayoutParams().width = 250;
-                    play = false;
-
-                    // create notification service
-                    // Intent stopIntent = new Intent(PlayMusicActivity.this, ForegroundService.class);
-                    // stopIntent.setAction(STOP_FOREGROUND_ACTION);
-                    // startService(stopIntent);
-                }
-                break;
-            case R.id.previous_button:
-            case R.id.next_button:
-                boolean wasPlaying = mPlayer.isPlaying();
-                if (v.getId() == R.id.previous_button) {
-                    mIdx = (mIdx == 0 ? musicArr.length - 1 : mIdx - 1);
-                } else {
-                    mIdx = (mIdx == musicArr.length - 1 ? 0 : mIdx + 1);
-                }
-                mPlayer.reset();
-                LoadMedia(mIdx);
-
-                if (wasPlaying) {
-                    mPlayer.start();
-                    //playBtn.setText("Pause");
-                    play = true;
-                }
-                break;
-        }
-    }
-
-    MediaPlayer.OnCompletionListener mOnComplete = new MediaPlayer.OnCompletionListener() {
-        public void onCompletion(MediaPlayer arg0) {
-            mIdx = (mIdx == musicArr.length - 1 ? 0 : mIdx + 1);
-            mPlayer.reset();
-            LoadMedia(mIdx);
-            mPlayer.start();
-            play = true;
-        }
-    };
-
-    MediaPlayer.OnErrorListener mOnError = new MediaPlayer.OnErrorListener() {
-        @Override
-        public boolean onError(MediaPlayer mediaPlayer, int what, int extra) {
-            String err = "OnError occured what = " + what + " ,extra= " + extra;
-            Log.d("onError", err);
-            return false;
-        }
-    };
-
-    MediaPlayer.OnSeekCompleteListener mOnSeekComplete = new MediaPlayer.OnSeekCompleteListener() {
-        @Override
-        public void onSeekComplete(MediaPlayer mediaPlayer) {
-            if (play) {
-                mPlayer.start();
-            }
-        }
-    };
-
-    Handler mProgressHandler = new Handler() {
-        public void handleMessage(Message msg) {
-            if (mPlayer == null) return;
-            if (mPlayer.isPlaying()) {
-                seekBar.setProgress(mPlayer.getCurrentPosition());
-                setCurtime();
-            }
-            mProgressHandler.sendEmptyMessageDelayed(0, 200);
-        }
-    };
 
     SeekBar.OnSeekBarChangeListener mOnSeek = new SeekBar.OnSeekBarChangeListener() {
         @Override
         public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-            if (fromUser) {
-                mPlayer.seekTo(progress);
-            }
+
         }
         @Override
         public void onStartTrackingTouch(SeekBar seekBar) {
-            play = mPlayer.isPlaying();
-            if (play) {
-                mPlayer.pause();
-            }
+
         }
         @Override
-        public void onStopTrackingTouch(SeekBar seekBar) {
-        }
+        public void onStopTrackingTouch(SeekBar seekBar) { }
     };
+
+    public Point getScreenSize(Activity activity) {
+        Display display = activity.getWindowManager().getDefaultDisplay(); // 1번 과정
+        Point size = new Point();
+        display.getSize(size); // 2번 과정
+        return size;
+    }
+
 }
