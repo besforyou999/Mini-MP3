@@ -6,6 +6,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -34,10 +35,16 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     public static String STOP_FOREGROUND_ACTION  = "com.superdroid.test.activity.mainactivity.stopforeground";
+    public static String NEXT_ACTION             = "com.superdroid.test.activity.mainactivity.next";
+    public static String PREV_ACTION             = "com.superdroid.test.activity.mainactivity.prev";
+    public static String NEXT_PREV_RESULT        = "com.superdroid.test.activity.mainactivity.NextPrevResult";
 
-    private ArrayList<musicData> musicList;
+    private BroadcastReceiver mBroadcastReceiver;
 
-    // 앨범 생성용
+    private ArrayList<MusicData> musicList;
+    private Integer              musicIdx;
+    private Integer              musicNum;
+
     Bitmap                  androidIcon;
     MediaMetadataRetriever  mmr;
 
@@ -48,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 음악 제목, 음악 앨범 저장할 배열
         musicList   = new ArrayList<>();
+        musicIdx    = 0;
 
         // 음악 앨범 생성용
         mmr         = new MediaMetadataRetriever();
@@ -96,9 +104,11 @@ public class MainActivity extends AppCompatActivity {
 
         // 리스트뷰 어댑터에 목록 아이템 추가
         for (int i = 0 ; i < musicList.size() ; i++) {
-            musicData md = musicList.get(i);
+            MusicData md = musicList.get(i);
             adapter.addItem(md.getDrawable(),md.getTitle());
         }
+
+        musicNum = musicList.size();
 
         // 리스트뷰 아이템 클릭 핸들러 추가
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -107,9 +117,11 @@ public class MainActivity extends AppCompatActivity {
                ListViewItem item = (ListViewItem) parent.getItemAtPosition(position);
                String title = item.getMusicTitle();
                for (int i = 0 ; i < musicList.size() ; i++) {
-                   musicData md = musicList.get(i);
+                   MusicData md = musicList.get(i);
                    if (md.getTitle().equals(title)) {
+                       musicIdx = i;
                        Intent intent = new Intent();
+                       intent.putExtra("music_index", musicIdx);
                        intent.putExtra("music_title", title);
                        intent.putExtra("music_path", md.getPathId());
                        intent.putExtra("music_duration", md.getDuration());
@@ -119,6 +131,8 @@ public class MainActivity extends AppCompatActivity {
                }
            }
         });
+
+
     }
 
     public void buildSongList() {
@@ -127,11 +141,12 @@ public class MainActivity extends AppCompatActivity {
         Uri musicUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         Cursor cursor = mResolver.query(musicUri, null, null, null, null);
 
-        if (cursor == null) { Log.e("cursor", "album cursor null");
+        if (cursor == null) {
+            Log.e("cursor", "album cursor null");
             return;
         }
-
-        if (!cursor.moveToFirst()) { Log.e("cursor", "cursor moveToFirst error");
+        if (!cursor.moveToFirst()) {
+            Log.e("cursor", "cursor moveToFirst error");
             return;
         }
 
@@ -159,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
                 albumArt  = new BitmapDrawable(getResources(), bm);
             }
 
-            musicList.add(new musicData(MusicTitle, Artist, ID, pathId, Duration, albumArt ));
+            musicList.add(new MusicData(MusicTitle, Artist, ID, pathId, Duration, albumArt ));
 
         } while (cursor.moveToNext());
 

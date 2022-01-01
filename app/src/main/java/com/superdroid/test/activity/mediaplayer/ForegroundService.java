@@ -28,6 +28,7 @@ public class ForegroundService extends Service {
 
     public static String PLAY_ACTION             = "com.superdroid.test.activity.mainactivity.play";
     public static String PAUSE_ACTION            = "com.superdroid.test.activity.mainactivity.pause";
+    public static String NEXT_ACTION             = "com.superdroid.test.activity.mainactivity.next";
     public static String START_FOREGROUND_ACTION = "com.superdroid.test.activity.mainactivity.startforeground";
     public static String STOP_FOREGROUND_ACTION  = "com.superdroid.test.activity.mainactivity.stopforeground";
     public static String SEEKBAR_CURRENT_POS     = "com.superdroid.test.activity.mainactivity.seekbarCurrentPos";

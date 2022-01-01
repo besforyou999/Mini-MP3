@@ -2,7 +2,7 @@ package com.superdroid.test.activity.mediaplayer;
 
 import android.graphics.drawable.Drawable;
 
-public class musicData  {
+public class MusicData {
 
     private String   title;
     private String   musicArtist;
@@ -11,7 +11,7 @@ public class musicData  {
     private Integer  Duration;
     private Drawable drawable;
 
-    public musicData(String title, String musicArtist, Long ID, String pathID, Integer Duration, Drawable d) {
+    public MusicData(String title, String musicArtist, Long ID, String pathID, Integer Duration, Drawable d) {
         this.title       = title;
         this.musicArtist = musicArtist;
         this.ID          = ID;
